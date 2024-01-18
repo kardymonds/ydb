@@ -136,7 +136,7 @@ struct TTestBootstrap : public TTestActorRuntime {
         const TEvCheckpointStorage::TEvCreateCheckpointRequest& lhs,
         const TEvCheckpointStorage::TEvCreateCheckpointRequest& rhs) {
         return IsEqual(lhs.CoordinatorId, rhs.CoordinatorId)
-            && std::tie(lhs.CheckpointId, lhs.NodeCount) == std::tie(rhs.CheckpointId, rhs.NodeCount);
+            && std::tie(lhs.CheckpointId, lhs.NodeCount, lhs.Type) == std::tie(rhs.CheckpointId, rhs.NodeCount, rhs.Type);
     }
 
     bool IsEqual(
@@ -334,7 +334,12 @@ Y_UNIT_TEST_SUITE(TCheckpointCoordinatorTests) {
             NProto::TCheckpointGraphDescription graphDesc;
             graphDesc.MutableGraph()->CopyFrom(NProto::TGraphParams());
             ExpectEvent(StorageProxy, 
-                TEvCheckpointStorage::TEvCreateCheckpointRequest(CoordinatorId, checkpointId, 3, graphDesc
+                TEvCheckpointStorage::TEvCreateCheckpointRequest(
+                    CoordinatorId,
+                    checkpointId,
+                    3,
+                    graphDesc,
+                    NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT
                 ));
 
             MockCreateCheckpointResponse(checkpointId);
@@ -402,26 +407,27 @@ Y_UNIT_TEST_SUITE(TCheckpointCoordinatorTests) {
     };
 
     Y_UNIT_TEST(ShouldTriggerCheckpointWithSource) {
-        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource, "PqSource");
-        test.RegisterCoordinator();
         CheckpointsTestHelper test(ETestGraphFlags::InputWithSource);
-        test.InjectCheckpoint();
-        test.AllSavedAndCommited();
+        test.RegisterCoordinator();
+        test.InjectCheckpoint(test.CheckpointId1);
+        test.AllSavedAndCommited(test.CheckpointId1);
     }
 
     Y_UNIT_TEST(ShouldTriggerCheckpointWithSourcesAndWithChannel) {
         CheckpointsTestHelper test(ETestGraphFlags::InputWithSource | ETestGraphFlags::SourceWithChannelInOneTask);
-        
         test.RegisterCoordinator();
-        test.InjectCheckpoint();
-        test.AllSavedAndCommited();
+        test.InjectCheckpoint(test.CheckpointId1);
+        test.AllSavedAndCommited(test.CheckpointId1);
     }
 
     Y_UNIT_TEST(ShouldAbortPreviousCheckpointsIfNodeStateCantBeSaved) {
         CheckpointsTestHelper test(ETestGraphFlags::InputWithSource);
         test.RegisterCoordinator();
-        test.InjectCheckpoint();
-        test.SaveFailed();
+        test.InjectCheckpoint(test.CheckpointId1);
+        test.SaveFailed(test.CheckpointId1);
+
+        test.NextCheckpointSuccess();
+        test.InjectCheckpoint(test.CheckpointId2, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT);
     }
 }
 

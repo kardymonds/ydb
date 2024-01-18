@@ -102,7 +102,7 @@ public:
 
 private:
     void InitCheckpoint();
-    void InjectCheckpoint(const TCheckpointId& checkpointId);
+    void InjectCheckpoint(const TCheckpointId& checkpointId, NYql::NDqProto::TCheckpoint::EType type);
     void ScheduleNextCheckpoint();
     void UpdateInProgressMetric();
     void PassAway() override;
@@ -189,7 +189,7 @@ private:
     bool GraphIsRunning = false;
     bool InitingZeroCheckpoint = false;
     bool RestoringFromForeignCheckpoint = false;
-    bool NextCheckpointIsSnapshot = false;
+    bool NextCheckpointIsSnapshot = true;
 
     TCheckpointCoordinatorMetrics Metrics;
 
