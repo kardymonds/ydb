@@ -104,8 +104,6 @@ struct TTestRuntime {
         auto gc = NewGC(gcConfig, CheckpointStorage, StateStorage);
         ActorGC = Runtime->Register(gc.release());
 
-
-
         Runtime->DispatchEvents({}, TDuration::Zero());
 
         YdbDriver = std::make_unique<NYdb::TDriver>(NYdb::TDriverConfig().SetEndpoint(YdbEndpoint).SetDatabase(YdbDatabase));
@@ -149,14 +147,15 @@ struct TTestRuntime {
         SaveCheckpoint(coordinator, checkpointId3, false);
     }
 
-    void CheckpointSucceeded(const TCheckpointId& checkpointUpperBound) {
+    void CheckpointSucceeded(const TCheckpointId& checkpointUpperBound, NYql::NDqProto::TCheckpoint::EType type = NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT) {
         TActorId sender = Runtime->AllocateEdgeActor();
 
         TCoordinatorId coordinator("graph", 11);
 
         auto request = std::make_unique<TEvCheckpointStorage::TEvNewCheckpointSucceeded>(
             coordinator,
-            checkpointUpperBound);
+            checkpointUpperBound,
+            type);
 
         auto handle = MakeHolder<IEventHandle>(ActorGC, sender, request.release());
         Runtime->Send(handle.Release());
@@ -225,8 +224,22 @@ Y_UNIT_TEST_SUITE(TGcTest) {
         UNIT_ASSERT_VALUES_EQUAL(countResult.first, 2UL);
     }
 
-    Y_UNIT_TEST(ShouldRemovePreviousCheckpointsIncrement)
+    Y_UNIT_TEST(ShouldIgnoreIncrementCheckpoint)
     {
+        TTestRuntime runtime("ShouldIgnoreIncrementCheckpoint");
+
+        TCheckpointId checkpointId1(11, 1);
+        TCheckpointId checkpointId2(11, 2);
+        TCheckpointId checkpointId3(11, 3);
+
+        UNIT_ASSERT_VALUES_EQUAL(runtime.CountGraphDescriptions(), 3);
+
+        runtime.CheckpointSucceeded(checkpointId3,  NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_INCREMENT_OR_SNAPSHOT);
+
+        Sleep(TDuration::MilliSeconds(2000));
+        ICheckpointStorage::TGetCheckpointsResult getResult = runtime.CheckpointStorage->GetCheckpoints("graph").GetValueSync();
+        UNIT_ASSERT(getResult.second.Empty());
+        UNIT_ASSERT(getResult.first.size() == 3);
     }
 };
 

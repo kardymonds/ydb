@@ -136,7 +136,7 @@ struct TTestBootstrap : public TTestActorRuntime {
         const TEvCheckpointStorage::TEvCreateCheckpointRequest& lhs,
         const TEvCheckpointStorage::TEvCreateCheckpointRequest& rhs) {
         return IsEqual(lhs.CoordinatorId, rhs.CoordinatorId)
-            && std::tie(lhs.CheckpointId, lhs.NodeCount, lhs.Type) == std::tie(rhs.CheckpointId, rhs.NodeCount, rhs.Type);
+            && std::tie(lhs.CheckpointId, lhs.NodeCount) == std::tie(rhs.CheckpointId, rhs.NodeCount);
     }
 
     bool IsEqual(
@@ -150,7 +150,7 @@ struct TTestBootstrap : public TTestActorRuntime {
         const TEvCheckpointStorage::TEvCompleteCheckpointRequest& lhs,
         const TEvCheckpointStorage::TEvCompleteCheckpointRequest& rhs) {
         return IsEqual(lhs.CoordinatorId, rhs.CoordinatorId)
-            && std::tie(lhs.CheckpointId, lhs.StateSizeBytes) == std::tie(rhs.CheckpointId, rhs.StateSizeBytes);
+            && std::tie(lhs.CheckpointId, lhs.StateSizeBytes, lhs.Type) == std::tie(rhs.CheckpointId, rhs.StateSizeBytes, rhs.Type);
     }
 
     bool IsEqual(
@@ -328,7 +328,7 @@ Y_UNIT_TEST_SUITE(TCheckpointCoordinatorTests) {
             MockCheckpointsMetadataResponse();
         }
 
-        void InjectCheckpoint(TCheckpointId checkpointId, NYql::NDqProto::TCheckpoint::EType type = NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_INCREMENT_OR_SNAPSHOT) {
+        void InjectCheckpoint(TCheckpointId checkpointId, NYql::NDqProto::TCheckpoint::EType type = NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT) {
 
             Cerr << "Waiting for TEvCreateCheckpointRequest (storage)" << Endl;
             NProto::TCheckpointGraphDescription graphDesc;
@@ -338,8 +338,7 @@ Y_UNIT_TEST_SUITE(TCheckpointCoordinatorTests) {
                     CoordinatorId,
                     checkpointId,
                     3,
-                    graphDesc,
-                    NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT
+                    graphDesc
                 ));
 
             MockCreateCheckpointResponse(checkpointId);
@@ -347,11 +346,12 @@ Y_UNIT_TEST_SUITE(TCheckpointCoordinatorTests) {
             Cerr << "Waiting for TEvInjectCheckpointBarrier (ingress)" << Endl;
 
             ExpectEvent(IngressActor, 
-                NYql::NDq::TEvDqCompute::TEvInjectCheckpoint(checkpointId.SeqNo, checkpointId.CoordinatorGeneration, type
-                ));
+                NYql::NDq::TEvDqCompute::TEvInjectCheckpoint(checkpointId.SeqNo, checkpointId.CoordinatorGeneration, type));
         }
 
-        void AllSavedAndCommited(TCheckpointId checkpointId) {
+        void AllSavedAndCommited(
+            TCheckpointId checkpointId,
+            NYql::NDqProto::TCheckpoint::EType type = NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT) {
             MockNodeStateSavedEvent(checkpointId, IngressActor);
             MockNodeStateSavedEvent(checkpointId, MapActor);
             MockNodeStateSavedEvent(checkpointId, EgressActor);
@@ -384,7 +384,7 @@ Y_UNIT_TEST_SUITE(TCheckpointCoordinatorTests) {
 
             Cerr << "Waiting for TEvCompleteCheckpointRequest (storage)" << Endl;
             ExpectEvent(StorageProxy, 
-                TEvCheckpointStorage::TEvCompleteCheckpointRequest(CoordinatorId, checkpointId, 300));
+                TEvCheckpointStorage::TEvCompleteCheckpointRequest(CoordinatorId, checkpointId, 300, type));
 
             MockCompleteCheckpointResponse(checkpointId);
             MockRunGraph();
@@ -418,6 +418,17 @@ Y_UNIT_TEST_SUITE(TCheckpointCoordinatorTests) {
         test.RegisterCoordinator();
         test.InjectCheckpoint(test.CheckpointId1);
         test.AllSavedAndCommited(test.CheckpointId1);
+    }
+
+    Y_UNIT_TEST(ShouldIncrement) {
+        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource);
+        test.RegisterCoordinator();
+        test.InjectCheckpoint(test.CheckpointId1);
+        test.AllSavedAndCommited(test.CheckpointId1);
+
+        test.NextCheckpointSuccess();
+        test.InjectCheckpoint(test.CheckpointId2, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_INCREMENT_OR_SNAPSHOT);
+        test.AllSavedAndCommited(test.CheckpointId2, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_INCREMENT_OR_SNAPSHOT);
     }
 
     Y_UNIT_TEST(ShouldAbortPreviousCheckpointsIfNodeStateCantBeSaved) {

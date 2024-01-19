@@ -350,11 +350,11 @@ void TCheckpointCoordinator::InitCheckpoint() {
 
     std::unique_ptr<TEvCheckpointStorage::TEvCreateCheckpointRequest> req;
     if (GraphDescId) {
-        req = std::make_unique<TEvCheckpointStorage::TEvCreateCheckpointRequest>(CoordinatorId, nextCheckpointId, ActorsToWaitForSet.size(), GraphDescId, checkpointType);
+        req = std::make_unique<TEvCheckpointStorage::TEvCreateCheckpointRequest>(CoordinatorId, nextCheckpointId, ActorsToWaitForSet.size(), GraphDescId);
     } else {
         NProto::TCheckpointGraphDescription graphDesc;
         graphDesc.MutableGraph()->CopyFrom(GraphParams);
-        req = std::make_unique<TEvCheckpointStorage::TEvCreateCheckpointRequest>(CoordinatorId, nextCheckpointId, ActorsToWaitForSet.size(), graphDesc, checkpointType);
+        req = std::make_unique<TEvCheckpointStorage::TEvCreateCheckpointRequest>(CoordinatorId, nextCheckpointId, ActorsToWaitForSet.size(), graphDesc);
     }
 
     Send(StorageProxy, req.release(), IEventHandle::FlagTrackDelivery);
@@ -515,7 +515,7 @@ void TCheckpointCoordinator::Handle(const NYql::NDq::TEvDqCompute::TEvStateCommi
         auto durationMs = (TInstant::Now() - stats.CreatedAt).MilliSeconds();
         Metrics.LastCheckpointBarrierDeliveryTimeMillis->Set(durationMs);
         Metrics.CheckpointBarrierDeliveryTimeMillis->Collect(durationMs);
-        Send(StorageProxy, new TEvCheckpointStorage::TEvCompleteCheckpointRequest(CoordinatorId, checkpointId, stats.StateSize), IEventHandle::FlagTrackDelivery);
+        Send(StorageProxy, new TEvCheckpointStorage::TEvCompleteCheckpointRequest(CoordinatorId, checkpointId, stats.StateSize, checkpoint.GetType()), IEventHandle::FlagTrackDelivery);
     }
 }
 
