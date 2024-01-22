@@ -171,6 +171,8 @@ private:
     std::unique_ptr<TCheckpointIdGenerator> CheckpointIdGenerator;
     TCheckpointCoordinatorConfig Settings;
     const TDuration CheckpointingPeriod;
+    ui64 CheckpointingSnapshotRotationPeriod = 0;
+    ui64 CheckpointingSnapshotRotationIndex = 0;
     const NProto::TGraphParams GraphParams;
     TString GraphDescId;
 
@@ -189,7 +191,6 @@ private:
     bool GraphIsRunning = false;
     bool InitingZeroCheckpoint = false;
     bool RestoringFromForeignCheckpoint = false;
-    bool NextCheckpointIsSnapshot = true;
 
     TCheckpointCoordinatorMetrics Metrics;
 

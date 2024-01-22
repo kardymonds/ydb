@@ -57,6 +57,8 @@ TCheckpointCoordinator::TCheckpointCoordinator(TCoordinatorId coordinatorId,
     , RunActorId(runActorId)
     , Settings(settings)
     , CheckpointingPeriod(TDuration::MilliSeconds(Settings.GetCheckpointingPeriodMillis()))
+    , CheckpointingSnapshotRotationPeriod(Settings.GetCheckpointingSnapshotRotationPeriod())
+    , CheckpointingSnapshotRotationIndex(CheckpointingSnapshotRotationPeriod)   // First - snapshot
     , GraphParams(graphParams)
     , Metrics(TCheckpointCoordinatorMetrics(counters))
     , StateLoadMode(stateLoadMode)
@@ -340,9 +342,9 @@ void TCheckpointCoordinator::InitCheckpoint() {
     CC_LOG_I("[" << nextCheckpointId << "] Registering new checkpoint in storage");
 
     auto checkpointType = NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_INCREMENT_OR_SNAPSHOT;
-    if (NextCheckpointIsSnapshot) {
+    if (++CheckpointingSnapshotRotationIndex > CheckpointingSnapshotRotationPeriod) {
         checkpointType = NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT;
-        NextCheckpointIsSnapshot = false;
+        CheckpointingSnapshotRotationIndex = 0;
     }
     PendingCheckpoints.emplace(nextCheckpointId, TPendingCheckpoint(ActorsToWaitForSet, checkpointType));
     UpdateInProgressMetric();
@@ -384,7 +386,7 @@ void TCheckpointCoordinator::Handle(const TEvCheckpointStorage::TEvCreateCheckpo
         UpdateInProgressMetric();
         ++*Metrics.FailedToCreate;
         ++*Metrics.StorageError;
-        NextCheckpointIsSnapshot = true;
+        CheckpointingSnapshotRotationIndex = CheckpointingSnapshotRotationPeriod; // Next ceckpoint is snapshot.
         return;
     }
 
@@ -461,7 +463,7 @@ void TCheckpointCoordinator::Handle(const NYql::NDq::TEvDqCompute::TEvSaveTaskSt
         }
     } else {
         CC_LOG_E("[" << checkpointId << "] Can't save node state, aborting checkpoint");
-        NextCheckpointIsSnapshot = true;
+        CheckpointingSnapshotRotationIndex = CheckpointingSnapshotRotationPeriod;  // Next ceckpoint is snapshot.
         Send(StorageProxy, new TEvCheckpointStorage::TEvAbortCheckpointRequest(CoordinatorId, checkpointId, "Can't save node state"), IEventHandle::FlagTrackDelivery);
     }
 }

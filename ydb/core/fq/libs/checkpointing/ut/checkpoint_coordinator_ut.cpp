@@ -66,17 +66,21 @@ struct TTestBootstrap : public TTestActorRuntime {
     TCoordinatorId CoordinatorId;
     TCheckpointId CheckpointId1;
     TCheckpointId CheckpointId2;
+    TCheckpointId CheckpointId3;
+    TCheckpointId CheckpointId4;
 
     THashMap<TActorId, ui64> ActorToTask;
 
     ::NMonitoring::TDynamicCounterPtr Counters = new ::NMonitoring::TDynamicCounters();
 
-    explicit TTestBootstrap(ui64 graphFlags = 0)
+    explicit TTestBootstrap(ui64 graphFlags = 0, ui64 snaphotRotationPeriod = 0)
         : TTestActorRuntime(true)
         , GraphState(BuildTestGraph(graphFlags))
         , CoordinatorId("my-graph-id", 42)
         , CheckpointId1(CoordinatorId.Generation, 1)
         , CheckpointId2(CoordinatorId.Generation, 2)
+        , CheckpointId3(CoordinatorId.Generation, 3)
+        , CheckpointId4(CoordinatorId.Generation, 4)
     {
         TAutoPtr<TAppPrepare> app = new TAppPrepare();
         Initialize(app->Unwrap());
@@ -97,6 +101,7 @@ struct TTestBootstrap : public TTestActorRuntime {
         Settings = NConfig::TCheckpointCoordinatorConfig();
         Settings.SetEnabled(true);
         Settings.SetCheckpointingPeriodMillis(TDuration::Hours(1).MilliSeconds());
+        Settings.SetCheckpointingSnapshotRotationPeriod(snaphotRotationPeriod);
         Settings.SetMaxInflight(1);
 
         NYql::TDqConfiguration::TPtr DqSettings = MakeIntrusive<NYql::TDqConfiguration>();
@@ -301,8 +306,8 @@ Y_UNIT_TEST_SUITE(TCheckpointCoordinatorTests) {
     class CheckpointsTestHelper : public TTestBootstrap
     {
     public:
-        CheckpointsTestHelper(ui64 graphFlags)
-            : TTestBootstrap(graphFlags) {
+        CheckpointsTestHelper(ui64 graphFlags, ui64 snaphotRotationPeriod = 0)
+            : TTestBootstrap(graphFlags, snaphotRotationPeriod) {
         }
         
         void RegisterCoordinator() {
@@ -401,43 +406,62 @@ Y_UNIT_TEST_SUITE(TCheckpointCoordinatorTests) {
             MockRunGraph();
         }
 
-        void NextCheckpointSuccess() {
+        void ScheduleCheckpointing() {
             MockScheduleCheckpointing();
         }
     };
 
     Y_UNIT_TEST(ShouldTriggerCheckpointWithSource) {
-        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource);
+        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource, 0);
         test.RegisterCoordinator();
         test.InjectCheckpoint(test.CheckpointId1);
         test.AllSavedAndCommited(test.CheckpointId1);
     }
 
     Y_UNIT_TEST(ShouldTriggerCheckpointWithSourcesAndWithChannel) {
-        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource | ETestGraphFlags::SourceWithChannelInOneTask);
+        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource | ETestGraphFlags::SourceWithChannelInOneTask, 0);
         test.RegisterCoordinator();
         test.InjectCheckpoint(test.CheckpointId1);
         test.AllSavedAndCommited(test.CheckpointId1);
     }
 
-    Y_UNIT_TEST(ShouldIncrement) {
-        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource);
+    Y_UNIT_TEST(ShouldAllSnapshots) {
+        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource, 0);
         test.RegisterCoordinator();
         test.InjectCheckpoint(test.CheckpointId1);
         test.AllSavedAndCommited(test.CheckpointId1);
 
-        test.NextCheckpointSuccess();
+        test.ScheduleCheckpointing();
+        test.InjectCheckpoint(test.CheckpointId2, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT);
+        test.AllSavedAndCommited(test.CheckpointId2, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT);
+    }
+
+    Y_UNIT_TEST(Should2Increments1Snapshot) {
+        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource, 2);
+        test.RegisterCoordinator();
+        test.InjectCheckpoint(test.CheckpointId1);
+        test.AllSavedAndCommited(test.CheckpointId1);
+
+        test.ScheduleCheckpointing();
         test.InjectCheckpoint(test.CheckpointId2, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_INCREMENT_OR_SNAPSHOT);
         test.AllSavedAndCommited(test.CheckpointId2, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_INCREMENT_OR_SNAPSHOT);
+
+        test.ScheduleCheckpointing();
+        test.InjectCheckpoint(test.CheckpointId3, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_INCREMENT_OR_SNAPSHOT);
+        test.AllSavedAndCommited(test.CheckpointId3, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_INCREMENT_OR_SNAPSHOT);
+
+        test.ScheduleCheckpointing();
+        test.InjectCheckpoint(test.CheckpointId4, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT);
+        test.AllSavedAndCommited(test.CheckpointId4, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT);
     }
 
     Y_UNIT_TEST(ShouldAbortPreviousCheckpointsIfNodeStateCantBeSaved) {
-        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource);
+        CheckpointsTestHelper test(ETestGraphFlags::InputWithSource, 0);
         test.RegisterCoordinator();
         test.InjectCheckpoint(test.CheckpointId1);
         test.SaveFailed(test.CheckpointId1);
 
-        test.NextCheckpointSuccess();
+        test.ScheduleCheckpointing();
         test.InjectCheckpoint(test.CheckpointId2, NYql::NDqProto::TCheckpoint::EType::TCheckpoint_EType_SNAPSHOT);
     }
 }
