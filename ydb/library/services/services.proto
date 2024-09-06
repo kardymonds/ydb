@@ -400,6 +400,8 @@ enum EServiceKikimr {
     GROUPED_MEMORY_LIMITER = 2700;
 
     DATA_INTEGRITY = 3000;
+
+    YQ_ROW_DISPATCHER = 3100;
 };
 
 message TActivity {

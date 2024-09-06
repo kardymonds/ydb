@@ -117,6 +117,7 @@ class BaseTenant(abc.ABC):
         self.enable_logging("FQ_QUOTA_PROXY")
         self.enable_logging("PUBLIC_HTTP")
         self.enable_logging("FQ_CONTROL_PLANE_CONFIG")
+        self.enable_logging("YQ_ROW_DISPATCHER", LogLevels.TRACE)
         # self.enable_logging("GRPC_SERVER")
 
     @abc.abstractclassmethod
@@ -513,6 +514,16 @@ class YqTenant(BaseTenant):
         self.fill_gateways_cfg(fq_config['gateways'])
         self.fill_storage_config(fq_config['checkpoint_coordinator']['storage'],
                                  "CheckpointCoordinatorStorage_" + self.uuid)
+
+        fq_config['row_dispatcher'] = {
+            'enabled': True,
+            'timeout_before_start_session_sec': 2,
+            'send_status_period_sec': 2,
+            'max_session_used_memory': 1000000}
+        fq_config['row_dispatcher']['coordinator'] = {'enabled': True, 'node_path': "row_dispatcher"}
+        fq_config['row_dispatcher']['coordinator']['storage'] = {}
+        self.fill_storage_config(fq_config['row_dispatcher']['coordinator']['storage'],
+                                 "RowDispatcher_" + self.uuid)
 
         fq_config['quotas_manager'] = {'enabled': True}
 
