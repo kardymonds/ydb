@@ -9,10 +9,11 @@
 namespace NYql {
 
 struct TDummyTopic {
-    TDummyTopic(const TString& cluster, const TString& path, const TMaybe<TString>& filePath = {})
+    TDummyTopic(const TString& cluster, const TString& topicName, const TMaybe<TString>& filePath = {}, size_t partitionCount = 1)
         : Cluster(cluster)
-        , Path(path)
+        , TopicName(topicName)
         , FilePath(filePath)
+        , PartitionsCount(partitionCount)
     {
     }
 
@@ -22,7 +23,7 @@ struct TDummyTopic {
     }
 
     TString Cluster;
-    TString Path;
+    TString TopicName;
     TMaybe<TString> FilePath;
     size_t PartitionsCount = 1;
 };

@@ -92,6 +92,7 @@ NPq::NConfigurationManager::TAsyncDescribePathResult TPqSession::DescribePath(co
             }
             NPq::NConfigurationManager::TTopicDescription desc(path);
             desc.PartitionsCount = describeTopicResult.GetTopicDescription().GetTotalPartitionsCount();
+            Cerr << "desc.PartitionsCount " << desc.PartitionsCount << Endl;
             return NPq::NConfigurationManager::TDescribePathResult::Make<NPq::NConfigurationManager::TTopicDescription>(std::move(desc));
         });
     }
