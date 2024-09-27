@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 from dataclasses import dataclass
 import json
 import pathlib
@@ -5,10 +8,10 @@ import random
 from typing import List
 
 
-OUTPUT_DIR = "/home/vokayndzop/ydb/ydb/library/yql/tools/dqrun/data/"
+OUTPUT_DIR = "/home/kardymon-d/ydb3/ydb/ydb/library/yql/tools/dqrun/data"
 QUERIES_NUM = 2
 TABLE_NAME = "pq.`match`"
-ROW_NUM = 100
+ROW_NUM = 1000
 UINT64_COLUMN_NUM = 3#750
 STR32_COLUMN_NUM = 0#375
 STR64_COLUMN_NUM = 0#375
