@@ -152,8 +152,8 @@ public:
         , LogPrefix(TStringBuilder() << "SelfId: " << this->SelfId() << ", TxId: " << TxId << ", TaskId: " << taskId << ", PQ sink. ")
         , FreeSpace(freeSpace)
         , TopicClient(Driver, GetTopicClientSettings())
-        , File(std::get<TString>(TxId), EOpenModeFlag::CreateAlways |  EOpenModeFlag::WrOnly)
-    {
+        , File("data/result/" + std::get<TString>(TxId), EOpenModeFlag::CreateAlways |  EOpenModeFlag::WrOnly)
+    { 
         EgressStats.Level = statsLevel;
     }
 
