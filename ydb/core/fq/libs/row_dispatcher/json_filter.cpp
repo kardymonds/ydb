@@ -225,7 +225,9 @@ public:
         const TString& whereFilter,
         TCallback callback)
         : Sql(GenerateSql(columns, types, whereFilter)) {
-        auto factory = NYql::NPureCalc::MakeProgramFactory(NYql::NPureCalc::TProgramFactoryOptions());
+
+
+        auto factory = NYql::NPureCalc::MakeProgramFactory(NYql::NPureCalc::TProgramFactoryOptions().SetUDFsDir("/home/kardymon-d/ydb3/ydb/ydb/library/yql/udfs/common"));
 
         LOG_ROW_DISPATCHER_DEBUG("Creating program...");
         Program = factory->MakePushStreamProgram(

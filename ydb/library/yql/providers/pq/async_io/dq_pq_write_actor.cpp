@@ -152,7 +152,7 @@ public:
         , LogPrefix(TStringBuilder() << "SelfId: " << this->SelfId() << ", TxId: " << TxId << ", TaskId: " << taskId << ", PQ sink. ")
         , FreeSpace(freeSpace)
         , TopicClient(Driver, GetTopicClientSettings())
-        , File("data/result/" + std::get<TString>(TxId), EOpenModeFlag::CreateAlways |  EOpenModeFlag::WrOnly)
+        , File("data/result/" + std::get<TString>(TxId) + "_" + ToString(taskId), EOpenModeFlag::CreateAlways |  EOpenModeFlag::WrOnly)
     { 
         EgressStats.Level = statsLevel;
     }
@@ -317,10 +317,10 @@ private:
     }
 
     void CreateSessionIfNotExists() {
-        if (!WriteSession) {
-            WriteSession = TopicClient.CreateWriteSession(GetWriteSessionSettings());
-            SubscribeOnNextEvent();
-        }
+        // if (!WriteSession) {
+        //     WriteSession = TopicClient.CreateWriteSession(GetWriteSessionSettings());
+        //     SubscribeOnNextEvent();
+        // }
     }
 
     void SubscribeOnNextEvent() {

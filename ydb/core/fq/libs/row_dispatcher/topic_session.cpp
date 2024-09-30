@@ -549,6 +549,9 @@ void TTopicSession::SendToParsing(ui64 offset, const TString& message) {
         }
     }
 
+    if (ClientsWithoutPredicate.size() == Clients.size())
+        return;
+
     try {
         Parser->Push(offset, message);
     } catch (const std::exception& e) {
@@ -617,7 +620,7 @@ void TTopicSession::Handle(NFq::TEvRowDispatcher::TEvStartSession::TPtr& ev) {
             std::forward_as_tuple(ev->Sender), 
             std::forward_as_tuple(ev)).first->second;
 
-        TString predicate = clientInfo.Settings.GetSource().GetPredicate();
+        TString predicate;// = clientInfo.Settings.GetSource().GetPredicate();
         if (!predicate.empty()) {
             clientInfo.Filter = NewJsonFilter(
                 columns,
@@ -629,6 +632,8 @@ void TTopicSession::Handle(NFq::TEvRowDispatcher::TEvStartSession::TPtr& ev) {
         } else {
             ClientsWithoutPredicate.insert(ev->Sender);
         }
+
+        Cerr << "New client" << Endl;
 
         LOG_ROW_DISPATCHER_INFO("New client: offset " << clientInfo.NextMessageOffset << ", predicate: " << clientInfo.Settings.GetSource().GetPredicate());
 
