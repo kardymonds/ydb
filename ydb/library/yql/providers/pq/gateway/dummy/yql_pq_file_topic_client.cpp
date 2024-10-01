@@ -179,12 +179,16 @@ private:
 
     void PollFileForChanges() {
         TFileInput fi(File_);
+      //  ui64 ssize = 0;
+     //   ui64 counter = 0;
+
         while (!EventsQ_.IsStopped()) {
             TString rawMsg;
             TVector<TMessage> msgs;
 
             ui64 maxBatchRowSize = 100;
             while (size_t read = fi.ReadLine(rawMsg)) {
+           //     ssize += read;
                 msgs.emplace_back(MakeNextMessage(rawMsg));
                 MsgOffset_++;
                 if (!maxBatchRowSize--) {
@@ -192,9 +196,15 @@ private:
                 }
             }
             if (!msgs.empty()) {
+                
                 EventsQ_.Push(NYdb::NTopic::TReadSessionEvent::TDataReceivedEvent(msgs, {}, Session_), msgs.size());
             }
 
+          //  if (++counter == 10)
+             {
+                 //   counter = 0;
+           //     Cerr << "ReadLine "<< ssize <<  Endl;
+             }
             Sleep(FILE_POLL_PERIOD);
         }
     }
@@ -239,7 +249,7 @@ std::shared_ptr<NYdb::NTopic::IReadSession> TFileTopicClient::CreateReadSession(
         if (TFsPath(*topicsIt->second.Path).Exists() && topicsIt->second.PartitionsCount == 1) {
             filePath = *topicsIt->second.Path;
         } else {
-            filePath = TString(*topicsIt->second.Path) + "_" + ToString(partitionId);
+            filePath = TString(*topicsIt->second.Path);// + "_" + ToString(partitionId);
         }
     }
 

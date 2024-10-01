@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import argparse
 from dataclasses import dataclass
 import json
 import pathlib
+import sys
 import random
 from typing import List
 
 OUTPUT_DIR = "/home/kardymon-d/ydb3/ydb/ydb/library/yql/tools/dqrun/data"
-QUERIES_NUM = 200
+QUERIES_NUM = 1
 TABLE_NAME = "pq.`match`"
 ROW_NUM = 550000
 UINT64_COLUMN_NUM = 20
@@ -139,7 +141,9 @@ def gen_value(query_index: int, table: Table) -> str:
 
 
 def gen_query(query_index: int, table: Table, value: str) -> str:
-    return f"""$match = SELECT *
+    return f"""
+    PRAGMA dq.MaxTasksPerStage="1";
+$match = SELECT *
 FROM {table.name}
 WITH (
     FORMAT=json_each_row,
@@ -150,7 +154,7 @@ WITH (
 )
 WHERE {table.column_names[query_index % len(table.column_names)]} == {value};
 
-INSERT INTO pq.`match`
+INSERT INTO pq.`match2`
 SELECT ToBytes(Unwrap(Yson::SerializeJson(Yson::From(TableRow())))) FROM $match;
 """
 
@@ -160,12 +164,43 @@ def write_query(filename: str, query: str) -> None:
         file.write(query)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="",
+        epilog='Example: ./gen',
+    )
+    parser.add_argument('-p', '--pipe-only', dest='pipe_only', default=False, action='store_true')
+    args = parser.parse_args()
+    return args
+
+def gen_only_to_cout(column_names, column_types):
+    row_index = 0
+
+    while True:
+        row = gen_row(row_index, column_types)
+        #print(f"rows {row}")
+
+        json_doc = dict(zip(column_names, row))
+        json.dump({key: value for key, value in json_doc.items() if value is not None}, sys.stdout)
+        sys.stdout.write('\n')
+    
+        row_index = row_index + 1
+
+
+
 def main():
+    args = parse_args()
     validate()
+   # print(f"p  {args.pipe_only}")
 
     column_names = gen_column_names(COLUMN_NUM)
     column_types = gen_column_types(COLUMN_NUM)
+
+    if args.pipe_only:
+        gen_only_to_cout(column_names, column_types)
+        return
     rows = [gen_row(row_index, column_types) for row_index in range(ROW_NUM)]
+    
     table = gen_table(TABLE_NAME, column_names, column_types, rows)
     write_table(f"{OUTPUT_DIR}/data.txt", table)
 

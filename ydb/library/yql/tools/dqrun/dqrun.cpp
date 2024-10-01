@@ -1015,6 +1015,7 @@ int RunMain(int argc, const char* argv[])
                 size_t partitionCount = !partitionCountStr.empty() ? partitionCount = FromString<size_t>(partitionCountStr) : 1;
                 fileGateway->AddDummyTopic(TDummyTopic("pq", TString(topicName), TString(path), partitionCount));
             }
+             fileGateway->AddDummyTopic(TDummyTopic("pq", "match2", "path", 1));
             pqGateway = std::move(fileGateway);
         } else {
             pqGateway = CreatePqNativeGateway(pqServices);
