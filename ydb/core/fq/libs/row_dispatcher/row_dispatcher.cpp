@@ -260,6 +260,7 @@ class TRowDispatcher : public TActorBootstrapped<TRowDispatcher> {
     TString Tenant;
     NFq::NRowDispatcher::IActorFactory::TPtr ActorFactory;
     const ::NMonitoring::TDynamicCounterPtr Counters;
+    const ::NMonitoring::TDynamicCounterPtr Counters2;
     TRowDispatcherMetrics Metrics;
     NYql::IPqGateway::TPtr PqGateway;
     NActors::TMon* Monitoring;
@@ -337,6 +338,7 @@ public:
         NYql::ISecuredServiceAccountCredentialsFactory::TPtr credentialsFactory,
         const TString& tenant,
         const NFq::NRowDispatcher::IActorFactory::TPtr& actorFactory,
+        const ::NMonitoring::TDynamicCounterPtr& rd_counters,
         const ::NMonitoring::TDynamicCounterPtr& counters,
         const NYql::IPqGateway::TPtr& pqGateway,
         NActors::TMon* monitoring = nullptr);
@@ -414,6 +416,7 @@ TRowDispatcher::TRowDispatcher(
     NYql::ISecuredServiceAccountCredentialsFactory::TPtr credentialsFactory,
     const TString& tenant,
     const NFq::NRowDispatcher::IActorFactory::TPtr& actorFactory,
+    const ::NMonitoring::TDynamicCounterPtr& rd_counters,
     const ::NMonitoring::TDynamicCounterPtr& counters,
     const NYql::IPqGateway::TPtr& pqGateway,
     NActors::TMon* monitoring)
@@ -424,7 +427,8 @@ TRowDispatcher::TRowDispatcher(
     , LogPrefix("RowDispatcher: ")
     , Tenant(tenant)
     , ActorFactory(actorFactory)
-    , Counters(counters)
+    , Counters(rd_counters)
+    , Counters2(counters)
     , Metrics(counters)
     , PqGateway(pqGateway)
     , Monitoring(monitoring)
@@ -714,6 +718,13 @@ void TRowDispatcher::Handle(NFq::TEvRowDispatcher::TEvStartSession::TPtr& ev) {
     auto topicGroup = queryGroup->GetSubgroup("topic", CleanupCounterValueString(ev->Get()->Record.GetSource().GetTopicPath()));
     topicGroup->GetCounter("StartSession", true)->Inc();
 
+    auto group1 = Counters2->GetSubgroup("counters", "utils");
+    auto group2 = group1->GetSubgroup("execpool", "User");
+    auto group3 = group2->GetSubgroup("sensor", "ElapsedMicrosecByActivity");
+    auto counter = group3->GetNamedCounter("activity", "FQ_ROW_DISPATCHER_SESSION", true);
+
+    LOG_ROW_DISPATCHER_DEBUG("activity7 " << counter->Val());
+
     NodesTracker.AddNode(ev->Sender.NodeId());
     TMaybe<ui64> readOffset;
     if (ev->Get()->Record.HasOffset()) {
@@ -822,6 +833,15 @@ bool TRowDispatcher::CheckSession(TAtomicSharedPtr<ConsumerInfo>& consumer, cons
 }
 
 void TRowDispatcher::Handle(NFq::TEvRowDispatcher::TEvStopSession::TPtr& ev) {
+
+
+    auto group1 = Counters2->GetSubgroup("counters", "utils");
+    auto group2 = group1->GetSubgroup("execpool", "User");
+    auto group3 = group2->GetSubgroup("sensor", "ElapsedMicrosecByActivity");
+    auto counter = group3->GetNamedCounter("activity", "FQ_ROW_DISPATCHER_SESSION", true);
+
+    LOG_ROW_DISPATCHER_DEBUG("activity8 " << counter->Val());
+
     ConsumerSessionKey key{ev->Sender, ev->Get()->Record.GetPartitionId()};
     auto it = Consumers.find(key);
     if (it == Consumers.end()) {
@@ -1026,6 +1046,7 @@ std::unique_ptr<NActors::IActor> NewRowDispatcher(
     NYql::ISecuredServiceAccountCredentialsFactory::TPtr credentialsFactory,
     const TString& tenant,
     const NFq::NRowDispatcher::IActorFactory::TPtr& actorFactory,
+    const ::NMonitoring::TDynamicCounterPtr& rd_counters,
     const ::NMonitoring::TDynamicCounterPtr& counters,
     const NYql::IPqGateway::TPtr& pqGateway,
     NActors::TMon* monitoring)
@@ -1037,6 +1058,7 @@ std::unique_ptr<NActors::IActor> NewRowDispatcher(
         credentialsFactory,
         tenant,
         actorFactory,
+        rd_counters,
         counters,
         pqGateway,
         monitoring));

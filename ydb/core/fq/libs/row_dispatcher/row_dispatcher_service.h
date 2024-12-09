@@ -25,6 +25,7 @@ std::unique_ptr<NActors::IActor> NewRowDispatcherService(
     const TYqSharedResources::TPtr& yqSharedResources,
     NYql::ISecuredServiceAccountCredentialsFactory::TPtr credentialsFactory,
     const TString& tenant,
+    const ::NMonitoring::TDynamicCounterPtr& rd_counters,
     const ::NMonitoring::TDynamicCounterPtr& counters,
     const NYql::IPqGateway::TPtr& pqGateway,
     NActors::TMon* monitoring = nullptr);
