@@ -38,6 +38,7 @@ PEERDIR(
     library/cpp/regex/pcre
     library/cpp/threading/local_executor
     ydb/library/backup
+    ydb/library/formats/arrow/csv/table
     ydb/library/workload
     ydb/library/yaml_config/public
     ydb/public/lib/operation_id
